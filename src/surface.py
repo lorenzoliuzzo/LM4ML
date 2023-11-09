@@ -48,25 +48,32 @@ class ParametricSurface(object):
             If u or v is not within the specified domains.
         """
         u, v = q
-        if self.udomain.contains(u):
-            if self.vdomain.contains(v):
-                return jnp.array([self.x(u, v), self.y(u, v), self.z(u, v)])
-            else:
-                raise ValueError(f"v value {v} is outside the domain [{self.vdomain.start}, {self.vdomain.end}]")
-        else: 
-            raise ValueError(f"u value {u} is outside the domain [{self.udomain.start}, {self.udomain.end}]")
+        return jnp.array([self.x(u, v), self.y(u, v), self.z(u, v)])
+        # if self.udomain.contains(u):
+        #     if self.vdomain.contains(v):
+        #         return jnp.array([self.x(u, v), self.y(u, v), self.z(u, v)])
+        #     else:
+        #         raise ValueError(f"v value {v} is outside the domain [{self.vdomain.start}, {self.vdomain.end}]")
+        # else: 
+        #     raise ValueError(f"u value {u} is outside the domain [{self.udomain.start}, {self.udomain.end}]")
     
 
     def velocity(self, q: jnp.array, qdot: jnp.array):   
-        return jnp.dot(self.coordinate_vectors(q), qdot)
+        return jnp.dot(self.coordinate_vectors(q).T, qdot)
 
 
     def coordinate_vectors(self, q: jnp.array):
-        return jacrev(self.__call__)(q)
+        coord_vecs = jacrev(self.__call__)(q).T
+
+        # Normalize the coordinate vectors
+        norm_u = jnp.linalg.norm(coord_vecs[0])
+        norm_v = jnp.linalg.norm(coord_vecs[1])
+
+        return jnp.array([coord_vecs[0] / norm_u, coord_vecs[1] / norm_v])
 
 
     def metric(self, q: jnp.array):
-        jac_u, jac_v = self.coordinate_vectors(q).T
+        jac_u, jac_v = self.coordinate_vectors(q)
 
         E = jnp.dot(jac_u, jac_u)
         F = jnp.dot(jac_u, jac_v)
