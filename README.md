@@ -1,2 +1,2 @@
 # mec
-Mechanics Engine in C++
+Mechanics Engine in python

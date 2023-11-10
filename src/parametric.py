@@ -1,10 +1,32 @@
-from interval import Interval
 from jax import numpy as jnp
 from jax import jacrev
 from matplotlib import pyplot as plt
 
+class Interval(object):
+    # An interval class to represent a subset of R.
 
-class ParametricSurface(object):
+    def __init__(self, start, end):
+        """
+        Parameters
+        ----------
+        start   The start of the interval.
+        end     The end of the interval.
+        """
+        if (start > end):
+            tmp = end
+            end = start
+            start = tmp
+        self.start = start
+        self.end = end
+
+    def contains(self, t):
+        return jnp.logical_and(jnp.all(self.start <= t), jnp.all(t <= self.end))
+        
+    def midpoint(self):
+        return 0.5 * (self.end - self.start)
+
+
+class Surface(object):
     # A parametric surface in R^3.
 
     def __init__(self, x, y, z, udomain: Interval, vdomain: Interval):
@@ -107,45 +129,3 @@ class ParametricSurface(object):
         ax.scatter(x, y, z, color='red', marker='o')
         self.draw(ax, npoints)
         plt.show()
-
-
-class Sphere(ParametricSurface):
-    # A sphere in R^3.
-
-    def __init__(self, radius = 1.0, centre = jnp.array([0, 0, 0])):
-        """
-        Parameters
-        ----------
-        radius  The radius of the sphere.
-        centre  The centre of the sphere.
-        """
-        self.centre = centre
-        self.radius = radius
-        super().__init__(
-            lambda u, v: self.centre[0] + self.radius * jnp.cos(u) * jnp.sin(v),
-            lambda u, v: self.centre[1] + self.radius * jnp.sin(u) * jnp.sin(v),
-            lambda u, v: self.centre[2] + self.radius * jnp.cos(v),
-            Interval(0.0, 2.0*jnp.pi), Interval(0.0, jnp.pi)
-        )
-
-
-class Torus(ParametricSurface):
-    # A torus in R^3.
-
-    def __init__(self, R, r, centre = jnp.array([0, 0, 0])):
-        """ 
-        Parameters
-        ----------
-        centre  The centre of the torus.
-        R       The major radius of the torus.
-        r       The minor radius of the torus.
-        """
-        self.centre = centre
-        self.R = R
-        self.r = r
-        super().__init__(
-            lambda u, v: self.centre[0] + (self.R + self.r * jnp.cos(v)) * jnp.cos(u),
-            lambda u, v: self.centre[1] + (self.R + self.r * jnp.cos(v)) * jnp.sin(u),
-            lambda u, v: self.centre[2] + self.r * jnp.sin(v), 
-            Interval(0.0, 2.0*jnp.pi), Interval(0.0, 2.0*jnp.pi)
-        )
