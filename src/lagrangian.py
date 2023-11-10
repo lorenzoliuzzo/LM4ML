@@ -1,164 +1,98 @@
 from surface import ParametricSurface
-import inspect
 from jax import numpy as jnp
-from jax import jacrev, jit
-import time
+from jax import grad, hessian, jacfwd
+from jax.experimental.ode import odeint
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 class Lagrangian(object):
-    def __init__(self, potentials: list[callable] = [], **params) -> None:
+
+    def __init__(self, potentials: list[tuple[callable, dict]] = []) -> None:
         self.potentials = potentials
-        self.params = params
-        self.mass = None
-
-    def bind_mass(self, mass):
-        self.mass = mass    
-
-    def __call__(self, *args):
-        if self.mass is not None:
-            T = 0.5 * self.mass * jnp.dot(args[1], args[1])
-            V = 0.0
-            for potential in self.potentials:
-                potential_params = {param: self.params[param] for param in inspect.signature(potential).parameters if param in self.params}
-                V += potential(*args, mass=self.mass, **potential_params)
-            return T - V
-        else: 
-            raise NameError("Before calling the Lagrangian function you need to bind a mass calling self.bind_mass(mass=)")
-
-    # @jit
-    def euler_step(self, q, qdot, dt):
-        dLdx = jacrev(self.__call__, argnums=0)
-        q_new = q + dt * qdot
-        qdot_new = qdot + dt * dLdx(q, qdot)
-        return q_new, qdot_new
-
-    # @jit
-    def runge_kutta_step(self, q, qdot, dt):
-        dLdx = jacrev(self.__call__, argnums=0)
-
-        # Step 1: Compute k1
-        k1_qdotdot = dLdx(q, qdot)
-        k1_qdot_new = qdot + 0.5 * dt * k1_qdotdot
-
-        # Step 2: Compute k2
-        k2_qdotdot = dLdx(q + 0.5 * dt, qdot + 0.5 * dt * k1_qdotdot)
-        k2_qdot_new = qdot + 0.5 * dt * k2_qdotdot
-
-        # Step 3: Compute k3
-        k3_qdotdot = dLdx(q + 0.5 * dt, qdot + 0.5 * dt * k2_qdotdot)
-        k3_qdot_new = qdot + dt * k3_qdotdot
-
-        # Step 4: Compute k4
-        k4_qdotdot = dLdx(q + dt, qdot + dt * k3_qdotdot)
-
-        # Update q and qdot using weighted averages of k1, k2, k3, and k4
-        q_new = q + (dt / 6.0) * (qdot + 2 * (k1_qdot_new + k2_qdot_new) + k3_qdot_new + k4_qdotdot)
-        qdot_new = qdot + (dt / 6.0) * (k1_qdotdot + 2 * k2_qdotdot + 2 * k3_qdotdot + k4_qdotdot)
-
-        return q_new, qdot_new
-
-    # @jit
-    def evolve(self, q, qdot, tmax, tstep):
-        start_time = time.time()
-
-        positions = [q]
-        velocities = [qdot]
-
-        for _ in range(int(tmax / tstep)):
-            q, qdot = self.runge_kutta_step(q, qdot, tstep)
-            positions.append(q)
-            velocities.append(qdot)
-
-        elapsed_time = time.time() - start_time
-        print(f"Execution time: {elapsed_time} seconds")
-
-        return jnp.array(positions), jnp.array(velocities)
-
-    def animate_evolution(self, q0, qdot0, tmax, tstep):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        ax.set_title('Animation of the motion', y=1.05)
-
-        current_time = 0.0
-        time_text = ax.text2D(0.85, 0.05, "", transform=ax.transAxes, fontsize=12, color='black')
-
-        positions = [q0]
-
-        def update(frame):
-            nonlocal q0, qdot0, current_time
-            q_temp, qdot_temp = q0, qdot0
-
-            q0, qdot0 = self.runge_kutta_step(q_temp, qdot_temp, tstep)
-            positions.append(q0)
-
-            current_time += tstep
-
-            ax.cla()
-            ax.plot3D(*zip(*positions), color='blue')
-
-            time_text.set_text(f"Time: {current_time:.3f} seconds")
-
-        ani = FuncAnimation(fig, update, frames=int(tmax / tstep), init_func=lambda: [time_text])
-
-        plt.show()
 
 
-class ConstrainedLagrangian(Lagrangian):
-    def __init__(self, surface: ParametricSurface, potentials: list[callable] = [], **params) -> None:
-        self.map = surface
-        super(ConstrainedLagrangian, self).__init__(potentials, **params)
+    def __call__(self, q: jnp.ndarray, q_t: jnp.ndarray, mass) -> float:
+        V = 0.0
+        for pot_fn, pot_params in self.potentials:
+            V += pot_fn(q, q_t, mass, **pot_params)
+        T = 0.5 * mass * jnp.dot(q_t, q_t)
+        return T - V
 
-    def __call__(self, *args):
-        if self.mass is not None:
-            T = 0.5 * self.mass * jnp.dot(args[1], jnp.dot(self.map.metric(args[0]), args[1]))
-            V = 0.0
-            for potential in self.potentials:
-                potential_params = {param: self.params[param] for param in inspect.signature(potential).parameters if param in self.params}
-                V += potential(self.map(args[0]), self.map.velocity(args[0], args[1]), self.mass, **potential_params)
-            return T - V
-        else: 
-            raise NameError("Before calling the Lagrangian function you need to bind a mass calling self.bind_mass(mass=)")
+
+    def eom(self, q, q_t, mass):
+        dLdq = grad(self.__call__, argnums=0)
+        dLdq_t = grad(self.__call__, argnums=1)
+        H = hessian(self.__call__, argnums=1)(q, q_t, mass)
+        q_tt = (jnp.dot(jnp.linalg.pinv(H), dLdq(q, q_t, mass) - jnp.dot(jacfwd(dLdq_t, 0)(q, q_t, mass), q_t)))
+        return q_t, q_tt
+    
+    def integrate_eom(self, q0, q_t0, mass, time_span):
+        # Flatten the initial conditions for odeint
+        initial_conditions_flat = jnp.concatenate([q0, q_t0])
+
+        # Define a function for odeint
+        def dynamics(y, t, *args):
+            q, q_t = jnp.split(y, 2)
+            q_t, q_tt = self.eom(q, q_t, *args)
+            return jnp.concatenate([q_t, q_tt])
+
+        # Use odeint to integrate the equations of motion
+        result = odeint(dynamics, initial_conditions_flat, time_span, mass)
+
+        # Reshape the result to get q and q_t separately
+        q, q_t = jnp.split(result, 2, axis=-1)
+
+        return q, q_t
     
 
-    def animate_evolution(self, q0, qdot0, tmax, tstep):
+class ConstrainedLagrangian(Lagrangian):
+    def __init__(self, surface: ParametricSurface, potentials: list[tuple[callable, dict]] = []) -> None:
+        self.map = surface
+        super(ConstrainedLagrangian, self).__init__(potentials)
+
+    def __call__(self, q: jnp.ndarray, q_t: jnp.ndarray, mass) -> float:
+        V = 0.0
+        for pot_fn, pot_params in self.potentials:
+            V += pot_fn(self.map(q), self.map.velocity(q, q_t), mass, **pot_params)
+        T = 0.5 * mass * jnp.dot(q_t, jnp.dot(self.map.metric(q), q_t))
+        return T - V
+    
+    def draw_trajectory(self, q0, q_t0, mass, t_span) -> None:
+        positions, _ = self.integrate_eom(q0, q_t0, mass, t_span)
+        self.map.draw_point(positions.T)
+
+    def animate_trajectory(self, q0, q_t0, mass, t_span, save_path=None) -> None:
+        positions, _ = self.integrate_eom(q0, q_t0, mass, t_span)
+
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        ax.set_title('Constrained Lagrangian Animation', y=1.05)
-
-        # Plot the surface
+        ax.set_title("Animation of the motion")
+        
+        # Draw the surface
         self.map.draw(ax)
 
-        current_time = 0.0
-        time_text = ax.text2D(0.85, 0.05, "", transform=ax.transAxes, fontsize=12, color='black')
+        line, = ax.plot([], [], [], 'o-', lw=2)
+        time_text = ax.text2D(0.05, 0.95, '', transform=ax.transAxes)
 
-        # Initialize the point plot
-        point, = ax.plot3D([], [], [], color='blue', marker='o')
+        def init():
+            # Initialize the plot
+            line.set_data([], [])
+            line.set_3d_properties([])
+            time_text.set_text('')
+            ax.text2D(0.05, 0.95, '', transform=ax.transAxes)
+            return line, time_text
 
         def update(frame):
-            nonlocal q0, qdot0, current_time
-            q_temp, qdot_temp = q0, qdot0
+            # Update the plot for each frame
+            x, y, z = self.map(positions[frame, :])
+            line.set_data(x, y)
+            line.set_3d_properties(z)
+            time_text.set_text('Time: {:.2f}'.format(t_span[frame]))
+            return line, time_text
+    
+        anim = FuncAnimation(fig, update, frames=len(t_span), init_func=init, blit=True)
 
-            q0, qdot0 = self.runge_kutta_step(q_temp, qdot_temp, tstep)
-
-            # Update the point on the surface plot
-            point.set_data(*self.map(q0)[:2])
-            point.set_3d_properties(self.map(q0)[2])
-
-            current_time += tstep
-
-            time_text.set_text(f"Time: {current_time:.3f} seconds")
-
-            return point, time_text
-
-        ani = FuncAnimation(fig, update, frames=int(tmax / tstep), init_func=lambda: [point, time_text])
+        if save_path is not None:
+            anim.save(save_path, fps=30)
 
         plt.show()

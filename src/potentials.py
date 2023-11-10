@@ -1,8 +1,10 @@
 from jax import numpy as jnp
 
-def gravitational(x: jnp.array, xdot: jnp.array, mass, G=9.81):
+# Example potential function
+def gravitational(x: jnp.array, x_t: jnp.array, mass: float, G=9.81):
     return mass * G * x[2]
 
-def elastic(x: jnp.array, xdot: jnp.array, mass, k, fixed_pos, rest_length=0.0):
+# Example potential function
+def elastic(x: jnp.array, x_t: jnp.array, mass: float, k: float, fixed_pos: jnp.array, rest_length: float =0.0):
     displacement = fixed_pos - x
-    return 0.5 * mass * k * jnp.square(jnp.linalg.norm(displacement) - rest_length)
+    return 0.5 * k * jnp.sum(jnp.square(displacement)) 

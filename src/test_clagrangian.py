@@ -7,15 +7,19 @@ from jax import numpy as jnp
 
 
 # Initial conditions
-q0 = jnp.array([0.5, 0.3]) * jnp.pi
-qdot0 = jnp.array([0.1, 0.3])
+mass = 1.0
+q0 = jnp.array([0.0, 0.5]) * jnp.pi
+q_t0 = jnp.array([0.1, 0.0])
 
-L = ConstrainedLagrangian(surface=Sphere(radius=1.), potentials=[gravitational, elastic], k=20, fixed_pos=jnp.zeros(3))
+# setting the potential parameters
+gravitational_pot_params = {'G': 9.81}
+elastic_pot_params = {'k': 50, 'fixed_pos': jnp.zeros(3)}
 
-# mass
-m = 1.0
-L.bind_mass(m)
+# Creating the lagrangian
+L = ConstrainedLagrangian(surface=Torus(R=2.0, r=1.), potentials=[(gravitational, gravitational_pot_params), (elastic, elastic_pot_params)])
 
-print("Lagragian", L(q0, qdot0))
+# plotting the trajectory
+# L.draw_trajectory(q0, q_t0, mass, t_span=jnp.linspace(0.0, 20.0, 100))
 
-L.animate_evolution(q0, qdot0, tmax=30, tstep=0.2)
+# animating the trajectory
+L.animate_trajectory(q0, q_t0, mass, t_span=jnp.linspace(0.0, 20.0, 500))

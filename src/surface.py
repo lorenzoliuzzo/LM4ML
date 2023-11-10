@@ -1,7 +1,6 @@
 from interval import Interval
 from jax import numpy as jnp
 from jax import jacrev
-# from scipy.optimize import root
 from matplotlib import pyplot as plt
 
 
@@ -48,6 +47,7 @@ class ParametricSurface(object):
             If u or v is not within the specified domains.
         """
         u, v = q
+
         return jnp.array([self.x(u, v), self.y(u, v), self.z(u, v)])
         # if self.udomain.contains(u):
         #     if self.vdomain.contains(v):
@@ -56,7 +56,7 @@ class ParametricSurface(object):
         #         raise ValueError(f"v value {v} is outside the domain [{self.vdomain.start}, {self.vdomain.end}]")
         # else: 
         #     raise ValueError(f"u value {u} is outside the domain [{self.udomain.start}, {self.udomain.end}]")
-    
+
 
     def velocity(self, q: jnp.array, qdot: jnp.array):   
         return jnp.dot(self.coordinate_vectors(q).T, qdot)
@@ -140,7 +140,6 @@ class Torus(ParametricSurface):
         R       The major radius of the torus.
         r       The minor radius of the torus.
         """
-        
         self.centre = centre
         self.R = R
         self.r = r
@@ -148,24 +147,5 @@ class Torus(ParametricSurface):
             lambda u, v: self.centre[0] + (self.R + self.r * jnp.cos(v)) * jnp.cos(u),
             lambda u, v: self.centre[1] + (self.R + self.r * jnp.cos(v)) * jnp.sin(u),
             lambda u, v: self.centre[2] + self.r * jnp.sin(v), 
-                        Interval(0.0, 2.0*jnp.pi), Interval(0.0, 2.0*jnp.pi)
+            Interval(0.0, 2.0*jnp.pi), Interval(0.0, 2.0*jnp.pi)
         )
-
-
-
-# sphere = Sphere(radius=1.0)
-
-# q = jnp.array([0.4, 0.5 * jnp.pi])   
-# x = sphere(q)
-# print("q:\n", q)
-# print("x:\n", x)
-
-# qdot = jnp.array([0.0, 0.1])
-# xdot = sphere.velocity(q, qdot)
-# print("qdot:\n", qdot)
-# print("xdot:\n", xdot)
-
-# cv = sphere.coordinate_vectors(q)
-# print("coordinate vectors:\n", cv)
-
-# # sphere.draw_point(q)
