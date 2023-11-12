@@ -1,9 +1,13 @@
-from parametric import Surface
+import jax
 from jax import numpy as jnp
-from jax import grad, hessian, jacfwd
+import numpy as np
 from jax.experimental.ode import odeint
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation
+
+@jax.jit
+def kinetic_energy(q_t: jnp.ndarray, mass: jnp.ndarray):
+    return 0.5 * mass * jnp.linalg.norm(q_t)
+
 
 class Lagrangian(object):
     """
@@ -34,7 +38,6 @@ class Lagrangian(object):
         Parameters:
             potentials (list[tuple[callable, dict]]): A list of potential energy functions and their parameters.
         """
-
         self.potentials = potentials
 
     def __call__(self, q: jnp.ndarray, q_t: jnp.ndarray, mass) -> float:
@@ -48,15 +51,12 @@ class Lagrangian(object):
 
         Returns:
             float: The Lagrangian of the system.
-        """
+        """      
+        T = jnp.sum(jax.jit(kinetic_energy)(q_t, mass))
+        V = jnp.sum(jnp.array([pot_fn(q, q_t, mass, **pot_params) for pot_fn, pot_params in self.potentials]))
+        return T - V    
 
-        V = 0.0
-        for pot_fn, pot_params in self.potentials:
-            V += pot_fn(q, q_t, mass, **pot_params)
-        T = 0.5 * mass * jnp.dot(q_t, q_t)
-        return T - V
-
-    def eom(self, q, q_t, mass):
+    def eom(self, q: jnp.ndarray, q_t: jnp.ndarray, mass) -> tuple[jnp.ndarray, jnp.ndarray]:
         """
         Solves the equations of motion for the system.
 
@@ -68,14 +68,22 @@ class Lagrangian(object):
         Returns:
             Tuple[jnp.ndarray, jnp.ndarray]: Tuple containing updated velocities and accelerations.
         """
+        dLdq = jax.jacfwd(self.__call__, 0)(q, q_t, mass)
+        dLdq_t_dq = jax.jacfwd(jax.jacfwd(self.__call__, 1), 0)(q, q_t, mass)
+        H = jax.hessian(self.__call__, 1)(q, q_t, mass)
 
-        dLdq = grad(self.__call__, argnums=0)
-        dLdq_t = grad(self.__call__, argnums=1)
-        H = hessian(self.__call__, argnums=1)(q, q_t, mass)
-        q_tt = (jnp.dot(jnp.linalg.pinv(H), dLdq(q, q_t, mass) - jnp.dot(jacfwd(dLdq_t, 0)(q, q_t, mass), q_t)))
+        dot1 = jnp.tensordot(dLdq_t_dq, q_t, axes=((2, 3), (0, 1)))
+        q_tt = jnp.tensordot(jnp.linalg.pinv(H), dLdq - dot1, axes=((2, 3), (1, 0)))
+        
+        # print("dLdq", dLdq.shape, dLdq) # correct 
+        # print("dLdq_t_dq", dLdq_t_dq.shape, dLdq_t_dq) # correct
+        # print("H", H.shape, H) # correct
+        # print("dot1", dot1.shape, dot1)
+        # print("q_tt", q_tt.shape, q_tt)
+
         return q_t, q_tt
 
-    def integrate_eom(self, q0, q_t0, mass, time_span):
+    def eom_int(self, q0: jnp.ndarray, q_t0: jnp.ndarray, mass, t_span) -> tuple[jnp.ndarray, jnp.ndarray]:
         """
         Integrates the equations of motion over a specified time span.
 
@@ -83,146 +91,55 @@ class Lagrangian(object):
             q0 (jnp.ndarray): Initial generalized coordinates.
             q_t0 (jnp.ndarray): Initial velocities corresponding to the generalized coordinates.
             mass: Mass of the system.
-            time_span: Time span for integration.
+            t_span: Time span for integration.
 
         Returns:
             Tuple[jnp.ndarray, jnp.ndarray]: Tuple containing integrated generalized coordinates and velocities.
         """
-
         # Flatten the initial conditions for odeint
         initial_conditions_flat = jnp.concatenate([q0, q_t0])
 
         # Define a function for odeint
-        def dynamics(y, t, *args):
+        def dynamics(y, t):
             q, q_t = jnp.split(y, 2)
-            q_t, q_tt = self.eom(q, q_t, *args)
-            return jnp.concatenate([q_t, q_tt])
+            q_t, q_tt = self.eom(q, q_t, mass)
+            result = jnp.concatenate([q_t, q_tt])  # Flatten the result
+            return result
 
         # Use odeint to integrate the equations of motion
-        result = odeint(dynamics, initial_conditions_flat, time_span, mass)
+        result = odeint(dynamics, initial_conditions_flat, t_span)
 
         # Reshape the result to get q and q_t separately
-        q, q_t = jnp.split(result, 2, axis=-1)
+        q, q_t = jnp.split(result, 2, axis=1)
 
         return q, q_t
 
-class ConstrainedLagrangian(Lagrangian):
-    """
-    ConstrainedLagrangian class for solving the equations of motion in a Lagrangian mechanics system
-    with constraints represented by a Surface.
 
-    Attributes:
-        surface (Surface): Parametric surface representing the constraints.
-
-    Methods:
-        __init__(self, surface: Surface, potentials: list[tuple[callable, dict]] = []) -> None:
-            Constructor for the ConstrainedLagrangian class.
-
-        __call__(self, q: jnp.ndarray, q_t: jnp.ndarray, mass) -> float:
-            Calculates the Lagrangian of the system with constraints.
-
-        draw_trajectory(self, q0, q_t0, mass, t_span) -> None:
-            Draws the trajectory of the system with constraints.
-
-        animate_trajectory(self, q0, q_t0, mass, t_span, save_path=None) -> None:
-            Animates the trajectory of the system with constraints.
-
-    """
-
-    def __init__(self, surface: Surface, potentials: list[tuple[callable, dict]] = []) -> None:
+    def draw_trajectory(self, q0: jnp.ndarray, q_t0: jnp.ndarray, mass, t_span) -> None:
         """
-        Constructor for the ConstrainedLagrangian class.
+        Draws the trajectories of the system without constraints.
 
         Parameters:
-            surface (Surface): Parametric surface representing the constraints.
-            potentials (list[tuple[callable, dict]]): A list of potential energy functions and their parameters.
-        """
-
-        self.map = surface
-        super(ConstrainedLagrangian, self).__init__(potentials)
-
-    def __call__(self, q: jnp.ndarray, q_t: jnp.ndarray, mass) -> float:
-        """
-        Calculates the Lagrangian of the system with constraints.
-
-        Parameters:
-            q (jnp.ndarray): Generalized coordinates.
-            q_t (jnp.ndarray): Velocities corresponding to the generalized coordinates.
-            mass: Mass of the system.
-
-        Returns:
-            float: The Lagrangian of the system with constraints.
-        """
-
-        V = 0.0
-        for pot_fn, pot_params in self.potentials:
-            V += pot_fn(self.map(q), self.map.velocity(q, q_t), mass, **pot_params)
-        T = 0.5 * mass * jnp.dot(q_t, jnp.dot(self.map.metric(q), q_t))
-        return T - V
-
-    def draw_trajectory(self, q0, q_t0, mass, t_span) -> None:
-        """
-        Draws the trajectory of the system with constraints.
-
-        Parameters:
-            q0 (jnp.ndarray): Initial generalized coordinates.
-            q_t0 (jnp.ndarray): Initial velocities corresponding to the generalized coordinates.
-            mass: Mass of the system.
+            q0 [jnp.ndarray]: List of initial generalized coordinates for each trajectory.
+            q_t0 [jnp.ndarray]: List of initial velocities for each trajectory.
+            mass (List): List of masses for each trajectory.
             t_span: Time span for integration.
 
         Returns:
             None
         """
-
-        positions, _ = self.integrate_eom(q0, q_t0, mass, t_span)
-        self.map.draw_point(positions.T)
-
-    def animate_trajectory(self, q0, q_t0, mass, t_span, save_path=None) -> None:
-        """
-        Animates the trajectory of the system with constraints.
-
-        Parameters:
-            q0 (jnp.ndarray): Initial generalized coordinates.
-            q_t0 (jnp.ndarray): Initial velocities corresponding to the generalized coordinates.
-            mass: Mass of the system.
-            t_span: Time span for integration.
-            save_path (str): Optional path to save the animation.
-
-        Returns:
-            None
-        """
-
-        positions, _ = self.integrate_eom(q0, q_t0, mass, t_span)
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.set_title("Animation of the motion")
+        ax.set_title("Trajectories of the motion")
+        ax.set_xlabel("X-axis")
+        ax.set_ylabel("Y-axis")
+        ax.set_zlabel("Z-axis")
 
-        # Draw the surface
-        self.map.draw(ax)
+        positions, _ = self.eom_int(q0, q_t0, mass, t_span)
 
-        line, = ax.plot([], [], [], 'o-', lw=2)
-        time_text = ax.text2D(0.05, 0.95, '', transform=ax.transAxes)
-
-        def init():
-            # Initialize the plot
-            line.set_data([], [])
-            line.set_3d_properties([])
-            time_text.set_text('')
-            ax.text2D(0.05, 0.95, '', transform=ax.transAxes)
-            return line, time_text
-
-        def update(frame):
-            # Update the plot for each frame
-            x, y, z = self.map(positions[frame, :])
-            line.set_data(x, y)
-            line.set_3d_properties(z)
-            time_text.set_text('Time: {:.2f}'.format(t_span[frame]))
-            return line, time_text
-
-        anim = FuncAnimation(fig, update, frames=len(t_span), init_func=init, blit=True)
-
-        if save_path is not None:
-            anim.save(save_path, fps=30)
+        # Iterate over n_bodies
+        for body in range(len(positions[0])):  
+            ax.scatter(positions[:, body, 0], positions[:, body, 1], positions[:, body, 2])
 
         plt.show()
