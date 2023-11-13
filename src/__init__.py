@@ -7,5 +7,6 @@ sys.path.append('src')  # Adjust the relative path as needed
 # # , Cone, Cylinder, Torus, Hyperboloid, HyperbolicParaboloid, Ellipsoid, EllipticCone, EllipticParaboloid, SpiralHelix, MobiusStrip, KleinBottle, KleinBottle2, TrefoilKnot 
 # from .potentials import gravitational, electric, elastic, harmonic
 
-from .lagrangian import Lagrangian
-from .potentials import gravity
+from .lagrangian import lagrangian, constrained_lagrangian, evolve_lagrangian, draw_trajectory, draw_trajectory_2d
+from .potentials import gravity, elastic
+from .surfaces import sphere

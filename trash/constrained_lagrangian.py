@@ -1,21 +1,5 @@
 
 
-@jax.jit 
-def spherical_coord(q: jnp.ndarray):
-    def x(q):
-        return jnp.cos(q[0]) * jnp.sin(q[1])
-    def y(q):
-        return jnp.sin(q[0]) * jnp.sin(q[1])
-    def z(q):
-        return jnp.cos(q[1])
-    
-    return jnp.array([x(q), y(q), z(q)])
-
-@jax.jit
-def sphere(q: jnp.ndarray, radius: float, center: jnp.ndarray = jnp.zeros(3)):
-    return center + radius * spherical_coord(q)
-
-
 
 # class ConstrainedLagrangian(Lagrangian):
 #     """
