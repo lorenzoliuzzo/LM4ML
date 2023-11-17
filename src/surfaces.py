@@ -2,29 +2,46 @@ import jax
 from jax import numpy as jnp
 
 
-def spherical_coord(q: jnp.ndarray, norm: float):
+def parametrization(constraint: callable, **kwargs) -> callable:
+    @jax.jit
+    def map(q: jnp.ndarray):
+        return constraint(q, **kwargs)
+    return map
+
+@jax.jit
+def spherical_coord(q: jnp.ndarray, norm: float =  1.0) -> jnp.ndarray:
+
+    if q.ndim == 1:
+        # If the input is a 1D array, convert it to a 2D array
+        q = q.reshape((1, -1))
+
     @jax.jit
     def x(q):
-        return norm * jnp.cos(q[:, 0]) * jnp.sin(q[:, 1])
+        return jnp.cos(q[:, 0]) * jnp.sin(q[:, 1])
     @jax.jit
     def y(q):
-        return norm * jnp.sin(q[:, 0]) * jnp.sin(q[:, 1])
+        return jnp.sin(q[:, 0]) * jnp.sin(q[:, 1])
     @jax.jit
     def z(q):
-        return norm * jnp.cos(q[:, 1])
+        return jnp.cos(q[:, 1])
     
     @jax.jit
-    def coord(q):
+    def point(q: jnp.array):
         return jnp.array([x(q), y(q), z(q)]).T
-    def grad(q):
-        return jax.jacfwd(coord)
     
-    return coord(q), grad(q)
+    return norm * point(q)
 
+@jax.jit
+def sphere(q: jnp.ndarray, radius: float = 1.0, center: jnp.ndarray = None):
+    r = spherical_coord(q, radius)
+    return r if center is None else center + r
 
-def sphere(q: jnp.ndarray, radius: float, center: jnp.array = jnp.zeros(3)):
-    coord, grad = spherical_coord(q, radius)
-    return center.T + coord, grad
+@jax.jit
+def double_pendolum(q: jnp.ndarray, l1: float, l2: float, fixed_pt: jnp.ndarray = None):
+    assert q.shape[0] == 2
+    x1 = sphere(q[0], l1, fixed_pt)
+    x2 = sphere(q[1], l2, x1)
+    return jnp.vstack([x1, x2])
 
 def cone(q: jnp.ndarray, height: float, radius: float, center: jnp.array = jnp.zeros(3)):
     @jax.jit

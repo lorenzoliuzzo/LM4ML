@@ -2,15 +2,15 @@ import jax
 from jax import numpy as jnp
 from scipy import constants
 
+
 @jax.jit
 def gravity(x: jnp.ndarray, x_t: jnp.ndarray, mass: jnp.array, g: float = 9.81) -> jnp.ndarray:
-    return g * jnp.sum(jnp.dot(jnp.diag(mass), x[:, 2]))
+    return g * jnp.sum(jnp.dot(jnp.diag(mass), x[:, -1]))
 
 @jax.jit
 def elastic(x: jnp.ndarray, x_t: jnp.ndarray, mass: jnp.array, k: float, l0: float = 0.0, fixed_pt: jnp.ndarray = jnp.zeros(3)):
     displacement = x - fixed_pt
     return 0.5 * k * jnp.linalg.norm(displacement)
-
 
 @jax.jit
 def gravitational(x: jnp.ndarray, x_t: jnp.ndarray, sources):
