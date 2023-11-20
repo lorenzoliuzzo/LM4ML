@@ -1,2 +1,2 @@
-# mec
-Mechanics Engine in python
+# LM4ML
+Lagrangian Mechanics for Machine Learning
