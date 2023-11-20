@@ -21,5 +21,3 @@ def test_gravity():
     # asserting the results from the equation of motion
     assert np.allclose(q_t, x_t)
     assert np.allclose(q_tt[:, -1], -9.81)
-
-test_gravity()

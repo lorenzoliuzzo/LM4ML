@@ -129,13 +129,12 @@ def evolve_lagrangian(t_span: jnp.array,
     def dynamics(y, t):
         q, q_t = jnp.split(y, 2)
         q_t, q_tt = lagrangian_eom(q, q_t, mass, potentials, constraint)
-        result = jnp.concatenate([q_t, q_tt])
-        return result
+        return jnp.concatenate([q_t, q_tt])
 
     # Use odeint to integrate the equations of motion
     result = odeint(dynamics, initial_conditions, t_span)
 
     # Reshape the result to get q and q_t separately
-    q, q_t = jnp.split(result, 2, axis=1)
+    q, q_t = jnp.split(result, 2)
 
     return q, q_t
