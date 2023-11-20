@@ -1,5 +1,5 @@
 import numpy as np
-from src.lagrangian import lagrangian, evolve_lagrangian
+from src.lagrangian import lagrangian, lagrangian_eom, evolve_lagrangian
 from src.potentials import potential_energy, elastic, gravity
 from src.surfaces import parametrization, sphere
 from src.plotting import draw_3D_trajectory, animate_3D_trajectory
@@ -24,8 +24,10 @@ k_pot = potential_energy(elastic, k=40, fixed_pt=np.ones(3))
 g_pot = potential_energy(gravity)
 
 # call the lagrangian function
-L, eom = lagrangian(q, q_t, mass, potentials=[k_pot, g_pot], constraint=surf)
+L = lagrangian(q, q_t, mass, potentials=[k_pot, g_pot], constraint=surf)
+eom = lagrangian_eom(q, q_t, mass, potentials=[k_pot, g_pot], constraint=surf)
 print("L", L)
+print("eom", eom)
 
 # evolving the lagrangian
 t0 = 0.0
@@ -35,7 +37,8 @@ tspan = np.linspace(t0, tmax, npoints)
 
 start = time()
 positions, _ = evolve_lagrangian(tspan, q, q_t, mass, potentials=[k_pot, g_pot], constraint=surf)
-print(f"Evolution finished in {time() - start}")
+end = time()
+print(f"Evolution finished in {end - start}")
 
 draw_3D_trajectory(positions, surf)
 animate_3D_trajectory(tspan, positions, surf)
