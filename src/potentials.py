@@ -2,6 +2,11 @@ import jax
 from jax import numpy as jnp
 from scipy import constants
 
+def potential_energy(pot_fn: callable, **kwargs) -> callable:
+    @jax.jit
+    def potential(q: jnp.ndarray, q_t: jnp.ndarray, mass: jnp.array):
+        return pot_fn(q, q_t, mass, **kwargs)
+    return potential
 
 @jax.jit
 def gravity(x: jnp.ndarray, x_t: jnp.ndarray, mass: jnp.array, g: float = 9.81) -> jnp.ndarray:

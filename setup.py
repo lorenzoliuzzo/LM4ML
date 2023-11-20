@@ -7,5 +7,5 @@ setup(
     author_email='lorenzoliuzzo@outlook.com',
     url='https://github.com/lorenzoliuzzo/mec',
     packages=find_packages(),
-    install_requires=[],
+    install_requires=[jax, matplotlib]
 )
