@@ -47,8 +47,10 @@ positions, velocities = evolve_lagrangian(tspan, q, q_t, mass, potentials=[g_pot
 # animate the trajectory
 animate_3D_trajectory(tspan, positions, constraint)
 ```
-![Double Pendulum Animation](https://raw.githubusercontent.com/lorenzoliuzzo/LMS/blob/master/media/double_pendulum.mp4)
 
+<p align="center">
+  <img src="media/double_pendulum.gif" alt="Double Pendulum Animation">
+</p>
 
 ## Installation
 To use the Lagrangian Mechanics Simulator, you can clone the repository and install the required dependencies:
