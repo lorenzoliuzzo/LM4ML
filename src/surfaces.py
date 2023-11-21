@@ -163,7 +163,7 @@ def double_pendulum(q: jnp.ndarray, l1: float, l2: float, fixed_pt: jnp.ndarray 
     return jnp.vstack([x1, x2])
 
 @jax.jit
-def triple_pendolum(q: jnp.ndarray, l1: float, l2: float, l3: float, fixed_pt: jnp.ndarray = None):
+def triple_pendulum(q: jnp.ndarray, l1: float, l2: float, l3: float, fixed_pt: jnp.ndarray = None):
     if (q.shape[1] == 1):
         x1 = circle(q[0], l1, fixed_pt)
         x2 = circle(q[1], l2, x1)

@@ -98,7 +98,7 @@ def animate_2D_trajectory(tspan, q, constraint=None):
     plt.show()
 
 
-def animate_3D_trajectory(tspan, q, constraint=None):
+def animate_3D_trajectory(tspan, q, constraint=None, save_path=None):
     if constraint is None:
         assert q.shape[2] == 3
     else:
@@ -130,4 +130,7 @@ def animate_3D_trajectory(tspan, q, constraint=None):
     
     ani = FuncAnimation(fig, update, frames=q.shape[0], fargs=(q, lines), blit=True, interval=50)
 
-    plt.show()
+    if save_path:
+        ani.save(save_path, writer='ffmpeg', fps=30)
+    else:
+        plt.show()

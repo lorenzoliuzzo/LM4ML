@@ -1,20 +1,20 @@
 import jax
 from jax import numpy as jnp
 from jax.experimental.ode import odeint
+from typing import Union, List
 
-
-def lagrangian(q: list[jnp.array], 
-               q_t: list[jnp.array], 
-               mass: list[float], 
+def lagrangian(q: Union[jnp.array, List[jnp.array]], 
+               q_t: Union[jnp.array, List[jnp.array]], 
+               mass: Union[float, List[float]],
                potentials: list[callable] = None,
                constraint: callable = None) -> float:
     """
     Computes the Lagrangian of a system and the equations of motion.
 
     Parameters:
-        q (list[jnp.array]): Generalized coordinates.
-        q_t (list[jnp.array]): Generalized velocities.
-        mass (list[float]): Mass of the system.
+        q (Union[jnp.array, List[jnp.array]]): Generalized coordinates.
+        q_t (Union[jnp.array, List[jnp.array]]): Generalized velocities.
+        mass (Union[float, List[float]]): Mass of the system.
         potentials (list[callable]): List of potential functions as 'potentials.potential_energy' functions.
         constraint (callable, optional): Constraint function to parametrize the coordinates as 'surface.parametrization' function.
 
@@ -105,7 +105,7 @@ def evolve_lagrangian(t_span: jnp.array,
                       q_t0: list[jnp.array], 
                       mass: list[float], 
                       potentials: list[callable] = None, 
-                      constraint: callable = None) -> tuple[jnp.array, jnp.array]:
+                      constraint: callable = None) -> tuple[jnp.ndarray, jnp.ndarray]:
     """
     Integrates the equations of motion over a specified time span.
 
