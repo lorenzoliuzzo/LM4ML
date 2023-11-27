@@ -134,3 +134,50 @@ def animate_3D_trajectory(tspan, q, constraint=None, save_path=None):
         ani.save(save_path, writer='ffmpeg', fps=30)
     else:
         plt.show()
+
+
+from .constraints import parametrization, double_pendulum
+from .potentials import potential, gravity
+from .evolution import lagrangian_eom
+
+def double_pendulum_phase_plot(l1, l2, npoints=100):
+    # Create sample data
+    theta = jnp.linspace(0, jnp.pi, npoints)
+
+
+    Q = jnp.array([theta, theta]).T
+    print("Q.shape", Q.shape)
+    
+    QDOT = jnp.zeros((Q.shape[0], Q.shape[1] + 1))
+    print("QDOT.shape", QDOT.shape)
+
+    mass = jnp.ones(npoints)
+    
+    # creating the constraint with parametrization
+    constraint = jax.vmap(parametrization(double_pendulum, l1=l1, l2=l2))
+
+    # creating the gravity with potential
+    g_pot = potential(gravity, g=9.81)   
+
+    print(constraint(Q).shape)
+
+    QDOT, QDDOT = lagrangian_eom(constraint(Q).T, QDOT, mass, potentials=[g_pot])
+
+    # QDOT, QDDOT = lagrangian_eom(Q, QDOT, mass, potentials=[g_pot], constraint=constraint)
+    QDDOT_norm = jnp.sqrt(QDDOT**2)  # Magnitude for color representation
+
+    # Create quiver plot with color map
+    fig, ax = plt.subplots()
+    quiver = ax.quiver(Q[0], Q[1], QDOT[0], QDOT[1], QDDOT_norm, cmap='viridis', scale=20)
+
+    # Add color bar
+    cbar = plt.colorbar(quiver)
+    cbar.set_label('Magnitude of QDDOT')
+
+    # Set plot title and labels
+    plt.title('Double Pendulum Phase Space')
+    plt.xlabel('Theta 1')
+    plt.ylabel('Theta 2')
+
+    # Show the plot
+    plt.show()

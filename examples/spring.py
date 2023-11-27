@@ -1,7 +1,7 @@
 import numpy as np
 from src.lagrangian import lagrangian, lagrangian_eom, evolve_lagrangian
 from src.potentials import potential_energy, elastic, gravity
-from src.surfaces import parametrization, sphere
+from src.constraints import parametrization, sphere
 from src.plotting import draw_3D_trajectory, animate_3D_trajectory
 from time import time
 

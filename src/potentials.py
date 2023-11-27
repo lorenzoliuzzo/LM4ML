@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 
-def potential_energy(pot_fn: callable, **kwargs) -> callable:
+def potential(pot_fn: callable, **kwargs) -> callable:
     """
     Wraps a potential energy function with given keyword arguments into a potential energy mapping function.
 
@@ -20,13 +20,12 @@ def potential_energy(pot_fn: callable, **kwargs) -> callable:
         The returned mapping function can be used in the context of defining potential energy for a Lagrangian system.
     """
     @jax.jit
-    def potential(q: jnp.ndarray, q_t: jnp.ndarray, mass: jnp.array):
+    def fn(q: jnp.ndarray, q_t: jnp.ndarray, mass: jnp.array):
         return pot_fn(q, q_t, mass, **kwargs)
-    return potential
-
+    return fn        
 
 @jax.jit
-def gravity(x: jnp.ndarray, x_t: jnp.ndarray, mass: jnp.array, g: float = 9.81) -> jnp.ndarray:
+def gravity(x: jnp.array, x_t: jnp.array, mass: jnp.array, g: float = 9.81) -> float:
     """
     Computes the gravitational potential energy for a system of particles.
 
@@ -42,7 +41,7 @@ def gravity(x: jnp.ndarray, x_t: jnp.ndarray, mass: jnp.array, g: float = 9.81) 
     Notes:
         Assumes the last column of x contains the vertical coordinate.
     """
-    return g * jnp.sum(jnp.dot(jnp.diag(mass), x[:, -1]))
+    return g * mass * x[-1]
 
 
 @jax.jit

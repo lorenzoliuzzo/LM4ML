@@ -1,4 +1,4 @@
-from src.surfaces import parametrization, triple_pendulum 
+from src.constraints import parametrization, triple_pendulum 
 from src.potentials import potential_energy, gravity
 from src.lagrangian import lagrangian, lagrangian_eom, evolve_lagrangian
 from src.plotting import animate_3D_trajectory 

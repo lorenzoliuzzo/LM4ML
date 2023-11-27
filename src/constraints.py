@@ -23,7 +23,7 @@ def parametrization(constraint: callable, **kwargs) -> callable:
 
 
 @jax.jit
-def polar_coord(q: jnp.ndarray, norm: float = 1.0) -> jnp.ndarray:
+def polar(q: float, norm: float = None) -> jnp.array:
     """
     Converts polar coordinates to Cartesian coordinates.
 
@@ -37,26 +37,56 @@ def polar_coord(q: jnp.ndarray, norm: float = 1.0) -> jnp.ndarray:
     Notes:
         If the input is a 1D array, it is reshaped to a 2D array.
     """
-    if q.ndim == 1:
-        q = q.reshape((1, -1))
 
     @jax.jit
+    def x(q: float):
+        return jnp.cos(q)
+
+    @jax.jit
+    def y(q: float):
+        return jnp.sin(q)
+
+    @jax.jit
+    def point(q: float):
+        return jnp.hstack([x(q), y(q)])
+
+    return norm * point(q) if norm is not None else point(q)
+
+
+@jax.jit
+def spherical(q: jnp.array, norm: float = 1.0) -> jnp.array:
+    """
+    Converts spherical coordinates to Cartesian coordinates.
+
+    Parameters:
+        q (jnp.ndarray): Input spherical coordinates.
+        norm (float, optional): Scaling factor for the output coordinates.
+
+    Returns:
+        jnp.ndarray: Cartesian coordinates.
+
+    """
+    @jax.jit
     def x(q):
-        return jnp.cos(q[:])
+        return jnp.cos(q[0]) * jnp.sin(q[1])
 
     @jax.jit
     def y(q):
-        return jnp.sin(q[:])
+        return jnp.sin(q[0]) * jnp.sin(q[1])
+
+    @jax.jit
+    def z(q):
+        return jnp.cos(q[1])
 
     @jax.jit
     def point(q: jnp.array):
-        return jnp.array([x(q), y(q)]).T
+        return  jnp.array([x(q), y(q), z(q)])
 
     return norm * point(q)
 
 
 @jax.jit
-def circle(q: jnp.ndarray, radius: float = 1.0, center: jnp.ndarray = None):
+def circle(q: float, radius: float = 1.0, center: jnp.array = None) -> jnp.array:
     """
     Maps polar coordinates to points on a circle.
 
@@ -71,96 +101,55 @@ def circle(q: jnp.ndarray, radius: float = 1.0, center: jnp.ndarray = None):
     Notes:
         If center is provided, the points are shifted accordingly.
     """
-    r = polar_coord(q, radius)
+    r = polar(q, radius)
     return r if center is None else center + r
 
 
 @jax.jit
-def spherical_coord(q: jnp.ndarray, norm: float = 1.0) -> jnp.ndarray:
-    """
-    Converts spherical coordinates to Cartesian coordinates.
-
-    Parameters:
-        q (jnp.ndarray): Input spherical coordinates.
-        norm (float, optional): Scaling factor for the output coordinates.
-
-    Returns:
-        jnp.ndarray: Cartesian coordinates.
-
-    Notes:
-        If the input is a 1D array, it is reshaped to a 2D array.
-    """
-    if q.ndim == 1:
-        q = q.reshape((1, -1))
-
-    @jax.jit
-    def x(q):
-        return jnp.cos(q[:, 0]) * jnp.sin(q[:, 1])
-
-    @jax.jit
-    def y(q):
-        return jnp.sin(q[:, 0]) * jnp.sin(q[:, 1])
-
-    @jax.jit
-    def z(q):
-        return jnp.cos(q[:, 1])
-
-    @jax.jit
-    def point(q: jnp.array):
-        return jnp.array([x(q), y(q), z(q)]).T
-
-    return norm * point(q)
-
-
-@jax.jit
-def sphere(q: jnp.ndarray, radius: float = 1.0, center: jnp.ndarray = None):
+def sphere(q: jnp.array, radius: float = 1.0, center: jnp.array = None) -> jnp.array:
     """
     Maps spherical coordinates to points on a sphere.
 
     Parameters:
-        q (jnp.ndarray): Input spherical coordinates.
+        q (jnp.array): Input spherical coordinates.
         radius (float, optional): Radius of the sphere.
-        center (jnp.ndarray, optional): Center of the sphere.
+        center (jnp.array, optional): Center of the sphere.
 
     Returns:
-        jnp.ndarray: Points on the sphere.
+        jnp.array: Points on the sphere.
 
     Notes:
         If center is provided, the points are shifted accordingly.
     """
-    r = spherical_coord(q, radius)
+    r = spherical(q, radius)
     return r if center is None else center + r
 
+
 @jax.jit
-def double_pendulum(q: jnp.ndarray, l1: float, l2: float, fixed_pt: jnp.ndarray = None):
+def double_pendulum(q: jnp.ndarray, l1: float, l2: float, fixed_pt: jnp.array = None):
     """
     Maps generalized coordinates of a double pendulum to Cartesian coordinates.
 
     Parameters:
-        q (jnp.ndarray): Generalized coordinates.
+        q (jnp.ndarray): Generalized coordinates for the two bodies.
         l1 (float): Length of the first pendulum.
         l2 (float): Length of the second pendulum.
-        fixed_pt (jnp.ndarray, optional): Fixed point for the pendulum.
+        fixed_pt (jnp.array, optional): Fixed point for the first pendulum.
 
     Returns:
         jnp.ndarray: Cartesian coordinates of the double pendulum.
-
-    Raises:
-        TypeError: If the dimensions of q are not supported.
-
-    Notes:
-        The function supports both 1D and 2D input arrays.
     """
+    assert q.shape[0] == 2 and q.shape[1] <= 2
+
     if q.shape[1] == 1:
         x1 = circle(q[0], l1, fixed_pt)
         x2 = circle(q[1], l2, x1)
     elif q.shape[1] == 2:
         x1 = sphere(q[0], l1, fixed_pt)
         x2 = sphere(q[1], l2, x1)
-    else:
-        raise ValueError("Unsupported dimensions for q. Expected 1 or 2 columns.")
 
     return jnp.vstack([x1, x2])
+
 
 @jax.jit
 def triple_pendulum(q: jnp.ndarray, l1: float, l2: float, l3: float, fixed_pt: jnp.ndarray = None):
